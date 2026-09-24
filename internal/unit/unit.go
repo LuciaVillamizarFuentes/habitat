@@ -3,7 +3,11 @@
 // ESTADO: solo dominio. Implementación → tareas T-01, T-02, T-05 del ROADMAP.
 package unit
 
-import "time"
+import (
+	"errors"
+	"strings"
+	"time"
+)
 
 type Kind string
 
@@ -12,6 +16,21 @@ const (
 	KindParking   Kind = "parking"
 	KindStorage   Kind = "storage"
 	KindCommerce  Kind = "commerce"
+)
+
+var validKinds = map[Kind]bool{
+	KindApartment: true,
+	KindParking:   true,
+	KindStorage:   true,
+	KindCommerce:  true,
+}
+
+var (
+	ErrInvalidCode        = errors.New("code is required")
+	ErrInvalidKind        = errors.New("kind is required")
+	ErrInvalidFloor       = errors.New("floor is invalid")
+	ErrInvalidArea        = errors.New("area is invalid")
+	ErrInvalidCoefficient = errors.New("coefficient is invalid")
 )
 
 // Unit es una unidad física del edificio.
@@ -25,5 +44,32 @@ type Unit struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
-// TODO(T-01): validar Kind, Code único, Floor >= -5, AreaM2 > 0, Coefficient en (0, 1].
-// TODO(T-02): Repository + Service + Handler siguiendo el módulo tenant.
+type CreateUnit struct {
+	Code        string  `json:"code"`
+	Kind        Kind    `json:"kind"`
+	Floor       int     `json:"floor"`
+	AreaM2      float64 `json:"area_m2"`
+	Coefficient float64 `json:"coefficient"` // coeficiente de copropiedad (Ley 675 de 2001)
+}
+
+// TODO(T-02): Repository + Service + Handler siguiendo el módulo tenant..
+func (in *CreateUnit) Validate() error {
+	in.Code = strings.TrimSpace(in.Code)
+	if in.Code == "" {
+		return ErrInvalidCode
+	}
+	in.Kind = Kind(strings.TrimSpace(string(in.Kind)))
+	if !validKinds[in.Kind] {
+		return ErrInvalidKind
+	}
+	if in.Floor < -5 {
+		return ErrInvalidFloor
+	}
+	if in.AreaM2 <= 0 {
+		return ErrInvalidArea
+	}
+	if in.Coefficient <= 0 || in.Coefficient > 1 {
+		return ErrInvalidCoefficient
+	}
+	return nil
+}
