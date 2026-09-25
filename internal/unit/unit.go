@@ -31,6 +31,8 @@ var (
 	ErrInvalidFloor       = errors.New("floor is invalid")
 	ErrInvalidArea        = errors.New("area is invalid")
 	ErrInvalidCoefficient = errors.New("coefficient is invalid")
+	ErrNotFound           = errors.New("unit not found")
+	ErrDuplicateCode      = errors.New("code already exists")
 )
 
 // Unit es una unidad física del edificio.

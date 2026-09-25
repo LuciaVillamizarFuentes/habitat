@@ -14,6 +14,7 @@ import (
 	"github.com/tu-usuario/habitat/internal/config"
 	"github.com/tu-usuario/habitat/internal/platform/httpx"
 	"github.com/tu-usuario/habitat/internal/tenant"
+	"github.com/tu-usuario/habitat/internal/unit"
 )
 
 func main() {
@@ -32,14 +33,10 @@ func run() error {
 	tenantRepo := tenant.NewMemoryRepository()
 	tenantSvc := tenant.NewService(tenantRepo)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
-	})
-	// TODO(T-07): GET /readyz que verifique la conexión a la base de datos.
-	tenant.NewHandler(tenantSvc).Routes(mux)
+	unitRepo := unit.NewMemoryRepository()
+	unitSvc := unit.NewService(unitRepo)
 
-	var handler http.Handler = mux
+	var handler http.Handler = newMux(tenantSvc, unitSvc)
 	handler = httpx.Logger(log, handler)
 	handler = httpx.Recoverer(log, handler)
 
@@ -75,4 +72,17 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
+}
+
+// newMux registra todas las rutas de la API. Separado de run() para poder
+// testear el wiring sin levantar un servidor real.
+func newMux(tenantSvc *tenant.Service, unitSvc *unit.Service) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
+	// TODO(T-07): GET /readyz que verifique la conexión a la base de datos.
+	tenant.NewHandler(tenantSvc).Routes(mux)
+	unit.NewHandler(unitSvc).Routes(mux)
+	return mux
 }
