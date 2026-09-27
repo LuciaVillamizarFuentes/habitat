@@ -21,6 +21,9 @@ func (h *Handler) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/tenants", h.create)
 	mux.HandleFunc("GET /api/v1/tenants", h.list)
 	mux.HandleFunc("GET /api/v1/tenants/{id}", h.get)
+	mux.HandleFunc("PATCH /api/v1/tenants/{id}", h.update)
+	mux.HandleFunc("DELETE /api/v1/tenants/{id}", h.delete)
+
 	// TODO(T-03): PATCH /api/v1/tenants/{id} y DELETE (soft delete -> Active=false).
 }
 
@@ -54,6 +57,29 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, t)
+}
+
+func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
+	var in UpdateInput
+	if err := httpx.Decode(r, &in); err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	t, err := h.svc.Update(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, t)
+}
+
+func (h *Handler) delete(w http.ResponseWriter, r *http.Request) {
+	err := h.svc.Delete(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusNoContent, nil)
 }
 
 // writeErr traduce errores de dominio a códigos HTTP.

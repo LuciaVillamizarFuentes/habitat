@@ -13,6 +13,7 @@ type Repository interface {
 	GetByID(ctx context.Context, id string) (Tenant, error)
 	GetByEmail(ctx context.Context, email string) (Tenant, error)
 	List(ctx context.Context) ([]Tenant, error)
+	Update(ctx context.Context, t Tenant) error
 }
 
 // MemoryRepository es una implementación en memoria, útil para desarrollo y tests.
@@ -33,6 +34,16 @@ func (r *MemoryRepository) Create(_ context.Context, t Tenant) error {
 		if existing.Email == t.Email {
 			return ErrDuplicateMail
 		}
+	}
+	r.data[t.ID] = t
+	return nil
+}
+
+func (r *MemoryRepository) Update(_ context.Context, t Tenant) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.data[t.ID]; !ok {
+		return ErrNotFound
 	}
 	r.data[t.ID] = t
 	return nil
@@ -66,7 +77,9 @@ func (r *MemoryRepository) List(_ context.Context) ([]Tenant, error) {
 	defer r.mu.RUnlock()
 	out := make([]Tenant, 0, len(r.data))
 	for _, t := range r.data {
-		out = append(out, t)
+		if t.Active {
+			out = append(out, t)
+		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.Before(out[j].CreatedAt) })
 	return out, nil
