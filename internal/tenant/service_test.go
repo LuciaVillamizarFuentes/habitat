@@ -186,3 +186,141 @@ func TestService_Delete(t *testing.T) {
 		}
 	})
 }
+
+// seedForList registra 3 inquilinos (Ana, Carlos, Beatriz, en ese orden de
+// creación) y desactiva a Beatriz, para poder probar cada filtro por separado.
+func seedForList(t *testing.T, svc *Service) []Tenant {
+	t.Helper()
+	ctx := context.Background()
+	inputs := []CreateInput{
+		{FullName: "Ana Gómez", Email: "ana@example.com", Phone: "111", UnitID: "U1"},
+		{FullName: "Carlos Ruiz", Email: "carlos@example.com", Phone: "222", UnitID: "U2"},
+		{FullName: "Beatriz Soto", Email: "beatriz@example.com", Phone: "333", UnitID: "U1"},
+	}
+	out := make([]Tenant, 0, len(inputs))
+	for _, in := range inputs {
+		created, err := svc.Register(ctx, in)
+		if err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		out = append(out, created)
+	}
+	if err := svc.Delete(ctx, out[2].ID); err != nil {
+		t.Fatalf("desactivar Beatriz: %v", err)
+	}
+	out[2].Active = false
+	return out
+}
+
+func TestService_List_Filters(t *testing.T) {
+	tests := []struct {
+		name       string
+		filter     FilterTenants
+		wantEmails []string // en el orden esperado (por CreatedAt asc)
+	}{
+		{
+			name:       "sin filtro devuelve todos",
+			filter:     FilterTenants{},
+			wantEmails: []string{"ana@example.com", "carlos@example.com", "beatriz@example.com"},
+		},
+		{
+			name:       "full_name exacto",
+			filter:     FilterTenants{FullName: strPtr("Ana Gómez")},
+			wantEmails: []string{"ana@example.com"},
+		},
+		{
+			name:       "full_name no coincide",
+			filter:     FilterTenants{FullName: strPtr("No Existe")},
+			wantEmails: nil,
+		},
+		{
+			name:       "email case insensitive",
+			filter:     FilterTenants{Email: strPtr("ANA@Example.com")},
+			wantEmails: []string{"ana@example.com"},
+		},
+		{
+			name:       "phone exacto",
+			filter:     FilterTenants{Phone: strPtr("222")},
+			wantEmails: []string{"carlos@example.com"},
+		},
+		{
+			name:       "unit_id con varios resultados",
+			filter:     FilterTenants{UnitID: strPtr("U1")},
+			wantEmails: []string{"ana@example.com", "beatriz@example.com"},
+		},
+		{
+			name:       "active true excluye inactivos",
+			filter:     FilterTenants{Active: boolPtr(true)},
+			wantEmails: []string{"ana@example.com", "carlos@example.com"},
+		},
+		{
+			name:       "active false solo inactivos",
+			filter:     FilterTenants{Active: boolPtr(false)},
+			wantEmails: []string{"beatriz@example.com"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := NewService(NewMemoryRepository())
+			seedForList(t, svc)
+
+			got, err := svc.List(context.Background(), 10, 1, tt.filter)
+			if err != nil {
+				t.Fatalf("List: %v", err)
+			}
+
+			gotEmails := make([]string, len(got))
+			for i, tn := range got {
+				gotEmails[i] = tn.Email
+			}
+			if len(gotEmails) != len(tt.wantEmails) {
+				t.Fatalf("emails = %v, want %v", gotEmails, tt.wantEmails)
+			}
+			for i := range gotEmails {
+				if gotEmails[i] != tt.wantEmails[i] {
+					t.Fatalf("emails = %v, want %v", gotEmails, tt.wantEmails)
+				}
+			}
+		})
+	}
+}
+
+func TestService_List_Pagination(t *testing.T) {
+	svc := NewService(NewMemoryRepository())
+	seeded := seedForList(t, svc) // 3 inquilinos: Ana, Carlos, Beatriz (en ese orden)
+	ctx := context.Background()
+
+	tests := []struct {
+		name       string
+		limit      uint64
+		page       uint64
+		wantEmails []string
+	}{
+		{name: "página 1", limit: 2, page: 1, wantEmails: []string{seeded[0].Email, seeded[1].Email}},
+		{name: "página 2", limit: 2, page: 2, wantEmails: []string{seeded[2].Email}},
+		{name: "página fuera de rango", limit: 2, page: 3, wantEmails: []string{}},
+		{name: "page en 0 se trata como la primera página", limit: 2, page: 0, wantEmails: []string{seeded[0].Email, seeded[1].Email}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := svc.List(ctx, tt.limit, tt.page, FilterTenants{})
+			if err != nil {
+				t.Fatalf("List: %v", err)
+			}
+			gotEmails := make([]string, len(got))
+			for i, tn := range got {
+				gotEmails[i] = tn.Email
+			}
+			if len(gotEmails) != len(tt.wantEmails) {
+				t.Fatalf("emails = %v, want %v", gotEmails, tt.wantEmails)
+			}
+			for i := range gotEmails {
+				if gotEmails[i] != tt.wantEmails[i] {
+					t.Fatalf("emails = %v, want %v", gotEmails, tt.wantEmails)
+				}
+			}
+		})
+	}
+}

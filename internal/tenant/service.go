@@ -53,8 +53,8 @@ func (s *Service) Get(ctx context.Context, id string) (Tenant, error) {
 	return s.repo.GetByID(ctx, id)
 }
 
-func (s *Service) List(ctx context.Context) ([]Tenant, error) {
-	return s.repo.List(ctx)
+func (s *Service) List(ctx context.Context, limit uint64, page uint64, filter FilterTenants) ([]Tenant, error) {
+	return s.repo.List(ctx, limit, page, filter)
 }
 
 func (s *Service) Update(ctx context.Context, id string, in UpdateInput) (Tenant, error) {

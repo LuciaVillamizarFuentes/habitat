@@ -48,6 +48,14 @@ type UpdateInput struct {
 	Active   *bool   `json:"active,omitempty"`
 }
 
+type FilterTenants struct {
+	FullName *string `json:"full_name,omitempty"`
+	Email    *string `json:"email,omitempty"`
+	Phone    *string `json:"phone,omitempty"`
+	UnitID   *string `json:"unit_id,omitempty"`
+	Active   *bool   `json:"active,omitempty"`
+}
+
 // Validate aplica las reglas de negocio mínimas.
 func (in *CreateInput) Validate() error {
 	in.FullName = strings.TrimSpace(in.FullName)
