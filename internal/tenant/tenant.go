@@ -40,6 +40,14 @@ type CreateInput struct {
 	UnitID   string `json:"unit_id"`
 }
 
+type UpdateInput struct {
+	FullName *string `json:"full_name,omitempty"`
+	Email    *string `json:"email,omitempty"`
+	Phone    *string `json:"phone,omitempty"`
+	UnitID   *string `json:"unit_id,omitempty"`
+	Active   *bool   `json:"active,omitempty"`
+}
+
 // Validate aplica las reglas de negocio mínimas.
 func (in *CreateInput) Validate() error {
 	in.FullName = strings.TrimSpace(in.FullName)
@@ -49,6 +57,22 @@ func (in *CreateInput) Validate() error {
 	}
 	if _, err := mail.ParseAddress(in.Email); err != nil {
 		return ErrInvalidEmail
+	}
+	return nil
+}
+
+func (in *UpdateInput) Validate() error {
+	if in.FullName != nil {
+		*in.FullName = strings.TrimSpace(*in.FullName)
+		if *in.FullName == "" {
+			return ErrInvalidName
+		}
+	}
+	if in.Email != nil {
+		*in.Email = strings.ToLower(strings.TrimSpace(*in.Email))
+		if _, err := mail.ParseAddress(*in.Email); err != nil {
+			return ErrInvalidEmail
+		}
 	}
 	return nil
 }
